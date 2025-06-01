@@ -13,7 +13,17 @@ import db
 # UI class
 # =========================
 class Window(QWidget):
-    def __init__(self):
+    """
+    Main application window for MyFinanceLog.
+
+    This class sets up the main layout, including the top bar, side bar,
+    and the main content area with the expenses table.
+    """
+    
+    def __init__(self) -> None:
+        """
+        initialize the main window and set up the layout.
+        """
         super().__init__()
         self.setWindowTitle("MyFinanceLog")
         self.setGeometry(100, 100, 1500, 750)
@@ -53,8 +63,8 @@ class Window(QWidget):
         # create top bar
         top_bar = QWidget()
         top_bar.setStyleSheet("background-color: lightgrey;")
-        top_bar_height = 100
-        top_bar.setFixedHeight(top_bar_height)
+        TOP_BAR_HEIGHT = 100
+        top_bar.setFixedHeight(TOP_BAR_HEIGHT)
         
         # top bar layout
         top_layout = QHBoxLayout()
@@ -65,7 +75,7 @@ class Window(QWidget):
         # logo
         logo_label = QLabel()
         logo_pixmap = QPixmap("assets/MyFinanceLog_logo.png")
-        logo_pixmap = logo_pixmap.scaledToHeight(top_bar_height)
+        logo_pixmap = logo_pixmap.scaledToHeight(TOP_BAR_HEIGHT)
         logo_label.setPixmap(logo_pixmap)
         
         # buttons
@@ -127,8 +137,6 @@ class Window(QWidget):
         
         # format and column names
         self.expenses_table.setEditTriggers(QTableWidget.NoEditTriggers)  # make table read-only
-        expenses = db.get_expenses()
-        self.expenses_table.setRowCount(len(expenses))
         self.expenses_table.setColumnCount(len(db.Expense.fields) + 1)
         column_names = db.get_column_names()
         self.expenses_table.setHorizontalHeaderLabels(column_names + ["Edit", "Delete"])
@@ -142,7 +150,22 @@ class Window(QWidget):
             }
         """)
         
-        # populate table with expenses and buttons
+        self._populate_expenses_table()
+        
+        # add table to main layout
+        main_layout.addWidget(self.expenses_table, 1, 1, 1, 1)
+        
+        
+        return main_content
+    
+    
+    def _populate_expenses_table(self) -> None:
+        """
+        populate the expenses table with data from the database
+        """
+        expenses = db.get_expenses()
+        self.expenses_table.setRowCount(len(expenses))
+        
         for row, expense in enumerate(expenses):
             for col, field in enumerate(db.Expense.fields[1:]):
                 
@@ -155,13 +178,20 @@ class Window(QWidget):
                     item.setTextAlignment(Qt.AlignCenter)
                 elif field == "amount":
                     item = QTableWidgetItem(f"{value:.2f}€")
-                    item.setTextAlignment(Qt.AlignRight)
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 elif field == "fixed":
                     item = QTableWidgetItem("Fixed" if value else "Variable")
                     item.setTextAlignment(Qt.AlignCenter)
+                elif field == "comment":
+                    # truncate long comments and add a tooltip with full text
+                    if len(value) > 50:
+                        item = QTableWidgetItem(value[:50] + "...")
+                        item.setToolTip(value)
+                    else:
+                        item = QTableWidgetItem(value)
                 else:
                     item = QTableWidgetItem(str(value))
-                    item.setTextAlignment(Qt.AlignLeft)
+                    item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                 
                 # set item flags to prevent editing
                 self.expenses_table.setItem(row, col, item)
@@ -170,27 +200,46 @@ class Window(QWidget):
             edit_btn = QPushButton("Edit")
             edit_btn.clicked.connect(lambda _, expense_id=expense.id: self.edit_expense(expense_id))
             style_edit_btns(edit_btn)
-            self.expenses_table.setCellWidget(row, len(db.Expense.fields) - 1, edit_btn)
+            EDIT_COL_INDEX = len(db.Expense.fields) - 1
+            self.expenses_table.setCellWidget(row, EDIT_COL_INDEX, edit_btn)
             
             # create delete button
             delete_btn = QPushButton("Delete")
             delete_btn.clicked.connect(lambda _, expense_id=expense.id: self.delete_expense(expense_id))
             style_delete_btns(delete_btn)
-            self.expenses_table.setCellWidget(row, len(db.Expense.fields), delete_btn)
+            DELETE_COL_INDEX = len(db.Expense.fields)
+            self.expenses_table.setCellWidget(row, DELETE_COL_INDEX, delete_btn)
+        
+        self.expenses_table.resizeColumnsToContents()
+        self.expenses_table.setColumnWidth(EDIT_COL_INDEX, 80)
+        self.expenses_table.setColumnWidth(DELETE_COL_INDEX, 80)
         
         
-        # add table to main layout
-        main_layout.addWidget(self.expenses_table, 1, 1, 1, 1)
-        
-        
-        return main_content
-    
     
     # ========================
     # event handlers
     # ========================
+    
+    def edit_expense(self, expense_id) -> None:
+        """
+        pop up a dialog to edit an expense
+        call the edit_expense method from db.py if confirmed
+        call the refresh_table method to update the table
+        """
+        reply = QMessageBox.question(
+            self,
+            "Edit Expense",
+            
+            # pop up with 
+        )
+    
 
-    def delete_expense(self, expense_id):
+    def delete_expense(self, expense_id) -> None:
+        """
+        pop up a confirmation dialog to delete an expense
+        call the delete_expense method from db.py if confirmed
+        call the refresh_table method to update the table
+        """
         reply = QMessageBox.question(
             self,
             "Delete Expense",
@@ -199,9 +248,16 @@ class Window(QWidget):
             QMessageBox.No
         )
         if reply == QMessageBox.Yes:
-            # Hier deine Löschlogik, z.B.:
             db.delete_expense(expense_id)
             self.refresh_table()
+    
+    
+    def refresh_table(self) -> None:
+        """
+        refresh the expenses table
+        """
+        self._populate_expenses_table()  
+    
 
 
 
@@ -209,7 +265,10 @@ class Window(QWidget):
 # design functions
 # ========================
 
-def style_top_bar_btns(button):
+def style_top_bar_btns(button) -> None:
+    """
+    style the top bar buttons for the navigation
+    """
     button.setStyleSheet("""
         QPushButton {
             background-color: #888888;
@@ -233,15 +292,18 @@ def style_top_bar_btns(button):
     """)
 
 
-def style_edit_btns(button):
+def style_edit_btns(button) -> None:
+    """
+    style the edit buttons in the expenses table
+    """
     button.setStyleSheet("""
         QPushButton {
             background-color: #00CD00;
             color: black;
             border-radius: 8px;
-            padding: 6px 22px;
+            padding: 6px 6px;
             font-size: 13px;
-            min-width: 10px;
+            min-width: 40px;
             max-width: 40px;
             min-height: 10px;
             max-height: 50px;
@@ -257,15 +319,18 @@ def style_edit_btns(button):
     """)
 
 
-def style_delete_btns(button):
+def style_delete_btns(button) -> None:
+    """
+    style the delete buttons in the expenses table 
+    """
     button.setStyleSheet("""
         QPushButton {
             background-color: #CD0000;
             color: black;
             border-radius: 8px;
-            padding: 6px 22px;
+            padding: 6px 6px;
             font-size: 13px;
-            min-width: 10px;
+            min-width: 40px;
             max-width: 40px;
             min-height: 10px;
             max-height: 50px;
