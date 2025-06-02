@@ -1,5 +1,17 @@
 # db.py
 
+"""
+Any changes to the database schema (e.g. adding, renaming, or removing columns)
+must be reflected consistently in the following places:
+
+- The `fields`, `__init__`, `__repr__`, and `__str__` methods of the `Expense` class
+- The SQL query in `create_table()`
+- The `__init__` method of the `ExpenseDialog` class
+
+All of these components rely on a consistent column structure.
+"""
+
+
 
 # =========================
 # imports
@@ -17,7 +29,7 @@ class Expense:
     
     fields = ["id", "date", "category", "name", "amount", "fixed", "comment"]
     
-    def __init__(self, id, date, category, name, amount, comment, fixed=0):
+    def __init__(self, id, date, category, name, amount, fixed, comment):
         self.id = id
         self.date = date
         self.category = category
@@ -38,14 +50,14 @@ class Expense:
 # database functions
 # =========================
 
-def get_connection():
+def get_connection() -> sqlite3.Connection:
     """
     return connection to the SQLite database
     """
     return sqlite3.connect("expensesDB.sqlite")
 
 
-def create_table():
+def create_table() -> None:
     """
     create the expenses table in the database if it does not exist
     """
@@ -65,7 +77,7 @@ def create_table():
         conn.commit()
         
 
-def add_expense(expense):
+def add_expense(expense) -> None:
     """
     add an expense entry to the database
     """
@@ -78,7 +90,7 @@ def add_expense(expense):
         conn.commit()
         
 
-def get_column_names():
+def get_column_names() -> list:
     """
     retrieve the column names of the expenses table
     """
@@ -91,7 +103,7 @@ def get_column_names():
         return columns
     
 
-def get_expenses():
+def get_expenses() -> list:
     """
     get all expenses from the database
     """
@@ -112,7 +124,25 @@ def get_expenses():
         return expenses
 
 
-def delete_expense(expense_id):
+def get_expense_by_id(expense_id) -> Expense | None:
+    """
+    get an expense entry from the database by its ID
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        sql = "SELECT * FROM expenses WHERE id = ?"
+        cursor.execute(sql, (expense_id,))
+        row = cursor.fetchone()
+        
+        if row:
+            return Expense(*row)
+        else:
+            # if no expense is found, return None and print error message
+            print(f"Expense with ID {expense_id} not found.")
+            return None
+
+
+def delete_expense(expense_id) -> None:
     """
     delete an expense entry from the database by its ID
     """
@@ -123,3 +153,16 @@ def delete_expense(expense_id):
         conn.commit()
 
 
+def edit_expense(expense_id, expense_data) -> None:
+    """
+    expense_id: int, expense_data: dict
+    edit an existing expense entry in the database
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        fields = [f for f in Expense.fields if f != "id"]
+        values = [expense_data.get(k, None) for k in fields]
+        set_clause = ", ".join([f"{field} = ?" for field in fields])
+        sql = f"UPDATE expenses SET {set_clause} WHERE id = ?"
+        cursor.execute(sql, values + [expense_id])
+        conn.commit()
