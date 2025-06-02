@@ -110,3 +110,16 @@ def get_expenses():
             expenses.append(expense)
         
         return expenses
+
+
+def delete_expense(expense_id):
+    """
+    delete an expense entry from the database by its ID
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        sql = "DELETE FROM expenses WHERE id = ?"
+        cursor.execute(sql, (expense_id,))
+        conn.commit()
+
+

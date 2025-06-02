@@ -3,7 +3,7 @@
 # =========================
 # imports
 # =========================
-from PyQt5.QtWidgets import QWidget, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox
+from PyQt5.QtWidgets import QWidget, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QSizePolicy
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 import db
@@ -26,7 +26,7 @@ class Window(QWidget):
         """
         super().__init__()
         self.setWindowTitle("MyFinanceLog")
-        self.setGeometry(100, 100, 1500, 750)
+        self.setGeometry(100, 100, 1450, 750)
         self.setStyleSheet("background-color: white;")
 
 
@@ -115,22 +115,29 @@ class Window(QWidget):
         # create layout for main content
         main_layout = QGridLayout()
         main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(30)
+        main_layout.setSpacing(10)
         main_content.setLayout(main_layout)
         
         # create title label
         title_label = QLabel("Recent Expenses")
         title_label.setStyleSheet("""
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
             color: #333333;
             margin-bottom: 10px;
         """)
+        title_label.setContentsMargins(0, 18, 0, 9)
+        title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label, 0, 1, 1, 1)
         
         # placeholder
-        placeholder = QLabel("spacing")
-        main_layout.addWidget(placeholder, 1, 0, 1, 1)
+        # placeholder_left = QLabel("spacing")
+        # placeholder_right = QLabel("spacing")
+        placeholder_bottom = QLabel("spacing")
+        placeholder_bottom.setStyleSheet("color: transparent;")
+        # main_layout.addWidget(placeholder_left, 1, 0, 1, 1)
+        # main_layout.addWidget(placeholder_right, 1, 2, 1, 1)
+        main_layout.addWidget(placeholder_bottom, 2, 1, 1, 1)
         
         # create table with expenses
         self.expenses_table = QTableWidget()
@@ -154,7 +161,6 @@ class Window(QWidget):
         
         # add table to main layout
         main_layout.addWidget(self.expenses_table, 1, 1, 1, 1)
-        
         
         return main_content
     
@@ -180,12 +186,12 @@ class Window(QWidget):
                     item = QTableWidgetItem(f"{value:.2f}€")
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 elif field == "fixed":
-                    item = QTableWidgetItem("Fixed" if value else "Variable")
+                    item = QTableWidgetItem("Fixed" if value == 1 else "Variable")
                     item.setTextAlignment(Qt.AlignCenter)
                 elif field == "comment":
                     # truncate long comments and add a tooltip with full text
                     if len(value) > 50:
-                        item = QTableWidgetItem(value[:50] + "...")
+                        item = QTableWidgetItem(value[:40] + "...")
                         item.setToolTip(value)
                     else:
                         item = QTableWidgetItem(value)
@@ -196,24 +202,50 @@ class Window(QWidget):
                 # set item flags to prevent editing
                 self.expenses_table.setItem(row, col, item)
             
+            
             # create edit button
             edit_btn = QPushButton("Edit")
             edit_btn.clicked.connect(lambda _, expense_id=expense.id: self.edit_expense(expense_id))
             style_edit_btns(edit_btn)
+            
+            # create a widget to center the edit button
+            edit_widget = QWidget()
+            edit_layout = QHBoxLayout(edit_widget)
+            edit_layout.addWidget(edit_btn)
+            edit_layout.setContentsMargins(0, 0, 0, 0)
+            edit_layout.setAlignment(Qt.AlignCenter)
+
+            # add the edit button
             EDIT_COL_INDEX = len(db.Expense.fields) - 1
             self.expenses_table.setCellWidget(row, EDIT_COL_INDEX, edit_btn)
+            
             
             # create delete button
             delete_btn = QPushButton("Delete")
             delete_btn.clicked.connect(lambda _, expense_id=expense.id: self.delete_expense(expense_id))
             style_delete_btns(delete_btn)
+            
+            # create a widget to center the delete button
+            delete_widget = QWidget()
+            delete_layout = QHBoxLayout(delete_widget)
+            delete_layout.addWidget(delete_btn)
+            delete_layout.setContentsMargins(0, 0, 0, 0)
+            delete_layout.setAlignment(Qt.AlignCenter)
+
+            # add the delete button
             DELETE_COL_INDEX = len(db.Expense.fields)
             self.expenses_table.setCellWidget(row, DELETE_COL_INDEX, delete_btn)
         
+        
+        # resize columns to fit content
         self.expenses_table.resizeColumnsToContents()
         self.expenses_table.setColumnWidth(EDIT_COL_INDEX, 80)
         self.expenses_table.setColumnWidth(DELETE_COL_INDEX, 80)
-        
+        total_width = sum(self.expenses_table.columnWidth(i) for i in range(self.expenses_table.columnCount()))
+        # self.expenses_table.setMinimumWidth(total_width + 25)
+        self.expenses_table.setMaximumWidth(total_width + 30)
+        # self.expenses_table.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+
         
     
     # ========================
@@ -301,12 +333,12 @@ def style_edit_btns(button) -> None:
             background-color: #00CD00;
             color: black;
             border-radius: 8px;
-            padding: 6px 6px;
+            padding: 3px 6px;
             font-size: 13px;
-            min-width: 40px;
-            max-width: 40px;
-            min-height: 10px;
-            max-height: 50px;
+            min-width: 45px;
+            max-width: 45px;
+            min-height: 12px;
+            max-height: 12px;
             border: 2px solid #555555;
         }
         QPushButton:hover {
@@ -328,12 +360,12 @@ def style_delete_btns(button) -> None:
             background-color: #CD0000;
             color: black;
             border-radius: 8px;
-            padding: 6px 6px;
+            padding: 3px 6px;
             font-size: 13px;
-            min-width: 40px;
-            max-width: 40px;
-            min-height: 10px;
-            max-height: 50px;
+            min-width: 45px;
+            max-width: 45px;
+            min-height: 12px;
+            max-height: 12px;
             border: 2px solid #555555;
         }
         QPushButton:hover {
