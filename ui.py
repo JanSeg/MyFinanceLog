@@ -48,8 +48,12 @@ class Window(QWidget):
         
         
         # side bar
-        self.side_bar = self.create_side_bar()
-        grid.addWidget(self.side_bar, 1, 0, 1, 1)
+        self.stacked_side_bar = QStackedWidget()
+        self.side_bar_main = self.create_side_bar_main()
+        self.side_bar_monthly = self.create_side_bar_monthly()
+        self.stacked_side_bar.addWidget(self.side_bar_main)       # index 0
+        self.stacked_side_bar.addWidget(self.side_bar_monthly)    # index 1
+        grid.addWidget(self.stacked_side_bar, 1, 0, 1, 1)
         
         
         # main content area
@@ -58,10 +62,19 @@ class Window(QWidget):
         self.monthly_content = self.create_monthly_content()
         self.stacked_content.addWidget(self.main_content)       # index 0
         self.stacked_content.addWidget(self.monthly_content)    # index 1
-        self.main_btn.clicked.connect(lambda: self.stacked_content.setCurrentIndex(0))
-        self.monthly_btn.clicked.connect(lambda: self.stacked_content.setCurrentIndex(1))
-        self.main_btn.click()
         grid.addWidget(self.stacked_content, 1, 1, 1, 1)
+        
+        
+        grid.setColumnStretch(0, 0)  # side bar
+        grid.setColumnStretch(1, 1)  # main content area
+        
+        
+        # connect buttons to switch between main and monthly content
+        # and set the initial content to main
+        self.main_btn.clicked.connect(lambda: (self.stacked_content.setCurrentIndex(0), self.stacked_side_bar.setCurrentIndex(0)))
+        self.monthly_btn.clicked.connect(lambda: (self.stacked_content.setCurrentIndex(1), self.stacked_side_bar.setCurrentIndex(1)))
+        self.main_btn.click()
+        
         
         
     # ========================
@@ -108,9 +121,9 @@ class Window(QWidget):
         return top_bar, main_btn, monthly_btn
     
     
-    def create_side_bar(self) -> QWidget:
+    def create_side_bar_main(self) -> QWidget:
         """
-        create side bar
+        create side bar for main content
         """
         
         # create side bar
@@ -130,6 +143,30 @@ class Window(QWidget):
         add_expense_btn.clicked.connect(lambda _: self.add_expense())
         side_layout.addWidget(add_expense_btn)
         
+        
+        return side_bar
+    
+    
+    def create_side_bar_monthly(self) -> QWidget:
+        """
+        create side bar for monthly overview content
+        """
+        
+        # create side bar
+        side_bar = QWidget()
+        side_bar.setStyleSheet("background-color: darkgrey;")
+        side_bar.setFixedWidth(300)
+        
+        side_layout = QVBoxLayout()
+        side_layout.setContentsMargins(10, 10, 10, 10)
+        side_layout.setSpacing(20)
+        side_bar.setLayout(side_layout)
+        
+        # button for adding a new expense
+        add_expense_btn = QPushButton("placeholder")
+        style_side_bar_btns(add_expense_btn)
+        add_expense_btn.clicked.connect(lambda _: self.add_expense())
+        side_layout.addWidget(add_expense_btn)
         
         return side_bar
     
