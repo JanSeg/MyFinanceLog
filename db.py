@@ -38,6 +38,21 @@ class Expense:
         self.fixed = fixed
         self.comment = comment
     
+    @classmethod
+    def from_dict(cls, data):
+        """
+        create an Expense object from a dictionary
+        """
+        return cls(
+            id=data.get("id"),
+            date=data.get("date"),
+            category=data.get("category"),
+            name=data.get("name"),
+            amount=data.get("amount"),
+            fixed=data.get("fixed", False),
+            comment=data.get("comment", "")
+        )
+    
     def __repr__(self):
         return f"Expense(id={self.id}, date={self.date}, category={self.category}, name={self.name}, amount={self.amount}, fixed={self.fixed}, comment={self.comment})"
     
@@ -76,32 +91,6 @@ def create_table() -> None:
         """)
         conn.commit()
         
-
-def add_expense(expense) -> None:
-    """
-    add an expense entry to the database
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        fields = [f for f in Expense.fields if f != "id"]
-        values = [getattr(expense, k) for k in fields]
-        sql = f"INSERT INTO expenses ({', '.join(fields)}) VALUES ({', '.join(['?'] * len(fields))})"
-        cursor.execute(sql, values)
-        conn.commit()
-        
-
-def get_column_names() -> list:
-    """
-    retrieve the column names of the expenses table
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(expenses)")
-        columns = [info[1] for info in cursor.fetchall()]
-        columns = columns[1:]
-        columns = [entry.capitalize() for entry in columns]
-        return columns
-    
 
 def get_expenses() -> list:
     """
@@ -142,14 +131,17 @@ def get_expense_by_id(expense_id) -> Expense | None:
             return None
 
 
-def delete_expense(expense_id) -> None:
+def add_expense(expense) -> None:
     """
-    delete an expense entry from the database by its ID
+    add an expense entry to the database
     """
     with get_connection() as conn:
         cursor = conn.cursor()
-        sql = "DELETE FROM expenses WHERE id = ?"
-        cursor.execute(sql, (expense_id,))
+        fields = [f for f in Expense.fields if f != "id"]
+        expense = Expense.from_dict(expense) if isinstance(expense, dict) else expense
+        values = [getattr(expense, k) for k in fields]
+        sql = f"INSERT INTO expenses ({', '.join(fields)}) VALUES ({', '.join(['?'] * len(fields))})"
+        cursor.execute(sql, values)
         conn.commit()
 
 
@@ -166,3 +158,39 @@ def edit_expense(expense_id, expense_data) -> None:
         sql = f"UPDATE expenses SET {set_clause} WHERE id = ?"
         cursor.execute(sql, values + [expense_id])
         conn.commit()
+    
+
+def delete_expense(expense_id) -> None:
+    """
+    delete an expense entry from the database by its ID
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        sql = "DELETE FROM expenses WHERE id = ?"
+        cursor.execute(sql, (expense_id,))
+        conn.commit()
+      
+
+def get_column_names() -> list:
+    """
+    retrieve the column names of the expenses table
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(expenses)")
+        columns = [info[1] for info in cursor.fetchall()]
+        columns = columns[1:]
+        columns = [entry.capitalize() for entry in columns]
+        return columns
+
+
+def get_categories() -> list:
+    """
+    retrieve the unique categories from the expenses table
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        sql = "SELECT DISTINCT category FROM expenses"
+        cursor.execute(sql)
+        categories = [row[0] for row in cursor.fetchall()]
+        return categories

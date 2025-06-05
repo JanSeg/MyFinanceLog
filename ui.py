@@ -3,10 +3,12 @@
 # =========================
 # imports
 # =========================
-from PyQt5.QtWidgets import QWidget, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QSizePolicy, QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QCheckBox, QTextEdit, QDateEdit, QStackedWidget
+from PyQt5.QtWidgets import QWidget, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QSizePolicy, QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QCheckBox, QTextEdit, QDateEdit, QStackedWidget, QComboBox
 from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QDate
+from PyQt5.QtCore import Qt, QDate
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+import datetime
 import db
 
 
@@ -25,6 +27,8 @@ class Window(QWidget):
         """
         initialize the main window and set up the layout.
         """
+        
+        # call the parent constructor and set the window title, geometry, and style
         super().__init__()
         self.setWindowTitle("MyFinanceLog")
         self.setGeometry(100, 100, 1450, 750)
@@ -68,6 +72,7 @@ class Window(QWidget):
         """"
         create top bar with logo and navigation buttons
         """
+        
         # create top bar
         top_bar = QWidget()
         top_bar.setStyleSheet("background-color: lightgrey;")
@@ -107,9 +112,24 @@ class Window(QWidget):
         """
         create side bar
         """
+        
+        # create side bar
         side_bar = QWidget()
         side_bar.setStyleSheet("background-color: darkgrey;")
         side_bar.setFixedWidth(300)
+        
+        # side bar layout
+        side_layout = QVBoxLayout()
+        side_layout.setContentsMargins(10, 10, 10, 10)
+        side_layout.setSpacing(20)
+        side_bar.setLayout(side_layout)
+        
+        # button for adding a new expense
+        add_expense_btn = QPushButton("Add Expense")
+        style_side_bar_btns(add_expense_btn)
+        add_expense_btn.clicked.connect(lambda _: self.add_expense())
+        side_layout.addWidget(add_expense_btn)
+        
         
         return side_bar
     
@@ -118,6 +138,8 @@ class Window(QWidget):
         """
         create main content area
         """
+        
+        # create main content area
         main_content = QWidget()
         main_content.setStyleSheet("background-color: white;")
         
@@ -179,12 +201,17 @@ class Window(QWidget):
         """
         populate the expenses table with data from the database
         """
+        
+        # get expenses from the database
+        # and set the number of rows in the table
         expenses = db.get_expenses()
         self.expenses_table.setRowCount(len(expenses))
         
+        # set column for edit and delete buttons
         EDIT_COL_INDEX = len(db.Expense.fields) - 1
         DELETE_COL_INDEX = len(db.Expense.fields)
         
+        # populate the table with expense data
         for row, expense in enumerate(expenses):
             for col, field in enumerate(db.Expense.fields[1:]):
                 
@@ -264,11 +291,51 @@ class Window(QWidget):
         """
         create monthly overview content area
         """
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        label = QLabel("Monthly Overview (hier kommt dein Inhalt)")
-        layout.addWidget(label)
-        return widget
+        
+        # create monthly content area
+        monthly_content = QWidget()
+        monthly_content.setStyleSheet("background-color: white;")
+        monthly_layout = QGridLayout()
+        monthly_layout.setContentsMargins(10, 10, 10, 10)
+        monthly_layout.setSpacing(10)
+        monthly_content.setLayout(monthly_layout)
+
+        # get expenses and calculate totals by category for selected month
+        expenses = db.get_expenses()
+        current_month = datetime.date.today().strftime("%Y-%m")
+        category_totals = {}
+        for expense in expenses:
+            if str(expense.date).startswith(current_month):
+                category_totals[expense.category] = category_totals.get(expense.category, 0) + expense.amount
+
+        # create pie chart
+        fig = Figure(figsize=(5, 5))
+        ax = fig.add_subplot(111)
+        if category_totals:
+            # append percentage ans total amount to labels
+            values = list(category_totals.values())
+            keys = list(category_totals.keys())
+            total = sum(values)
+            labels = [
+                f"{key} {value / total * 100:.1f}%, {value:.2f}€"
+                for key, value in zip(keys, values)
+            ]
+            # create pie chart with values and labels
+            ax.pie(
+                values,
+                labels = labels,
+                startangle = 90,
+                wedgeprops = dict(width=0.3, edgecolor='w')
+            )
+            ax.set_title("Expenses by Category")
+        else:
+            ax.text(0.5, 0.5, "No data for this month", ha='center', va='center')
+
+        # create canvas for the pie chart
+        canvas = FigureCanvas(fig)
+        monthly_layout.addWidget(canvas, 0, 0, 1, 1)
+
+        return monthly_content
 
         
     
@@ -276,12 +343,27 @@ class Window(QWidget):
     # event handlers
     # ========================
     
+    def add_expense(self) -> None:
+        """
+        pop up a dialog to add a new expense using the ExpenseDialog class
+        call the add_expense method from db.py if confirmed
+        call the refresh_table method to update the table
+        """
+        
+        dialog = ExpenseDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            expense_data = dialog.get_expense_data()
+            db.add_expense(expense_data)
+            self.refresh_table()
+    
+    
     def edit_expense(self, expense_id) -> None:
         """
         pop up a dialog to edit an expense using the ExpenseDialog class
         call the edit_expense method from db.py if confirmed
         call the refresh_table method to update the table
         """
+        
         expense = db.get_expense_by_id(expense_id)
         dialog = ExpenseDialog(self, expense)
         if dialog.exec_() == QDialog.Accepted:
@@ -290,13 +372,13 @@ class Window(QWidget):
             self.refresh_table()
         
     
-
     def delete_expense(self, expense_id) -> None:
         """
         pop up a confirmation dialog to delete an expense
         call the delete_expense method from db.py if confirmed
         call the refresh_table method to update the table
         """
+        
         reply = QMessageBox.question(
             self,
             "Delete Expense",
@@ -313,6 +395,7 @@ class Window(QWidget):
         """
         refresh the expenses table
         """
+        
         self._populate_expenses_table()  
 
 
@@ -329,11 +412,12 @@ class ExpenseDialog(QDialog):
         """
         initialize the dialog with input fields for expense data
         """
+        
+        # call the parent constructor and set up window
         super().__init__(parent)
         self.setWindowTitle("Edit Expense" if expense else "Add Expense")
         self.setMinimumWidth(400)
         layout = QVBoxLayout(self)
-        
         
         # date input field
         layout.addWidget(QLabel("Date:"))
@@ -345,7 +429,10 @@ class ExpenseDialog(QDialog):
         
         # category input field
         layout.addWidget(QLabel("Category:"))
-        self.category_input = QLineEdit()
+        self.category_input = QComboBox()
+        categories = db.get_categories()
+        self.category_input.addItems(categories)
+        self.category_input.setEditable(True)
         layout.addWidget(self.category_input)
         layout.addSpacing(10)
         
@@ -389,20 +476,29 @@ class ExpenseDialog(QDialog):
         # populate fields if editing an expense
         if expense:
             self.date_input.setDate(QDate.fromString(expense.date, "yyyy-MM-dd"))
-            self.category_input.setText(expense.category)
+            self.category_input.setCurrentText(expense.category)
             self.name_input.setText(str(expense.name))
             self.amount_input.setText(str(expense.amount))
             self.fixed_checkbox.setChecked(bool(expense.fixed))
             self.comment_input.setText(str(expense.comment))
+        else:
+            # set default values for adding a new expense
+            self.date_input.setDate(QDate.currentDate())
+            self.category_input.setCurrentText("please select a category")
+            self.name_input.setText("")
+            self.amount_input.setText("0.00")
+            self.fixed_checkbox.setChecked(False)
+            self.comment_input.setText("")
     
        
     def get_expense_data(self) -> dict:
         """
         get the data from the input fields and return it as a dictionary
         """
+        
         return {
             "date": self.date_input.text(),
-            "category": self.category_input.text(),
+            "category": self.category_input.currentText(),
             "name": self.name_input.text(),
             "amount": float(self.amount_input.text()),
             "fixed": 1 if self.fixed_checkbox.isChecked() else 0,
@@ -419,6 +515,35 @@ def style_top_bar_btns(button) -> None:
     """
     style the top bar buttons for the navigation
     """
+    
+    button.setStyleSheet("""
+        QPushButton {
+            background-color: #888888;
+            color: white;
+            border-radius: 8px;
+            padding: 6px 22px;
+            font-size: 17px;
+            min-width: 70px;
+            max-width: 150px;
+            min-height: 25px;
+            max-height: 50px;
+            border: 2px solid #555555;
+        }
+        QPushButton:hover {
+            background-color: #555555;
+            border: 2px solid #aaaaaa;
+        }
+        QPushButton:pressed {
+            background-color: #888888;
+        }
+    """)
+
+
+def style_side_bar_btns(button) -> None:
+    """
+    style the side bar buttons
+    """
+    
     button.setStyleSheet("""
         QPushButton {
             background-color: #888888;
@@ -446,6 +571,7 @@ def style_edit_btns(button) -> None:
     """
     style the edit buttons in the expenses table
     """
+    
     button.setStyleSheet("""
         QPushButton {
             background-color: #00CD00;
@@ -473,6 +599,7 @@ def style_delete_btns(button) -> None:
     """
     style the delete buttons in the expenses table 
     """
+    
     button.setStyleSheet("""
         QPushButton {
             background-color: #CD0000;
